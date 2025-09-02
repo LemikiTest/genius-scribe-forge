@@ -1,80 +1,108 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Canvas as FabricCanvas, Path } from "fabric";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 interface HandwritingTrainingProps {
-  onComplete: (trainedLetters: Record<string, string>) => void;
+  onComplete: (trainedLetters: Record<string, any[]>) => void;
   onClose: () => void;
 }
 
-const trainingLetters = ['a', 'e', 'i', 'o', 'u', 'n', 'm', 'r', 's', 't', 'l', 'd', 'h', 'c', 'f'];
+const trainingLetters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
 
 export const HandwritingTraining = ({ onComplete, onClose }: HandwritingTrainingProps) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [trainedLetters, setTrainedLetters] = useState<Record<string, string>>({});
+  const [trainedLetters, setTrainedLetters] = useState<Record<string, any[]>>({});
   const [isDrawing, setIsDrawing] = useState(false);
-  const [currentPath, setCurrentPath] = useState<string>("");
+  const [hasDrawn, setHasDrawn] = useState(false);
 
   const currentLetter = trainingLetters[currentIndex];
   const progress = ((currentIndex + 1) / trainingLetters.length) * 100;
 
-  const handleNext = () => {
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const canvas = new FabricCanvas(canvasRef.current, {
+      width: 300,
+      height: 300,
+      backgroundColor: '#ffffff',
+      isDrawingMode: true,
+    });
+
+    // Konfiguriere Zeichenmodus
+    canvas.freeDrawingBrush.color = '#2d1b69';
+    canvas.freeDrawingBrush.width = 3;
+
+    canvas.on('path:created', () => {
+      setHasDrawn(true);
+    });
+
+    setFabricCanvas(canvas);
+
+    return () => {
+      canvas.dispose();
+    };
+  }, [currentIndex]);
+
+  const saveCurrentLetter = () => {
+    if (!fabricCanvas || !hasDrawn) {
+      toast("Bitte zeichnen Sie den Buchstaben!");
+      return;
+    }
+
+    // Speichere alle gezeichneten Pfade für diesen Buchstaben
+    const objects = fabricCanvas.getObjects();
+    const letterPaths = objects.map(obj => {
+      const pathObj = obj as Path;
+      return {
+        pathString: pathObj.toSVG(),
+        left: obj.left || 0,
+        top: obj.top || 0,
+        scaleX: obj.scaleX || 1,
+        scaleY: obj.scaleY || 1,
+      };
+    });
+
+    setTrainedLetters(prev => ({ ...prev, [currentLetter]: letterPaths }));
+    setHasDrawn(false);
+    
     if (currentIndex < trainingLetters.length - 1) {
       setCurrentIndex(currentIndex + 1);
-      setCurrentPath("");
     } else {
-      // Training complete
-      onComplete(trainedLetters);
-      toast("Handschrift-Training abgeschlossen!");
+      // Training abgeschlossen
+      onComplete({ ...trainedLetters, [currentLetter]: letterPaths });
+      toast("Handschrift-Training abgeschlossen! Sie können jetzt Ihren Text eingeben.");
     }
   };
 
   const handleBack = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
-      setCurrentPath("");
+      setHasDrawn(false);
     }
   };
 
-  const handleSkip = () => {
-    // Use default letter shape
-    const defaultPath = generateDefaultLetterPath(currentLetter);
-    setTrainedLetters(prev => ({ ...prev, [currentLetter]: defaultPath }));
-    handleNext();
-  };
-
-  const generateDefaultLetterPath = (letter: string): string => {
-    // Generate basic letter paths
-    const paths: Record<string, string> = {
-      'a': 'M 10 30 Q 20 10 30 30 L 40 30 M 15 25 L 35 25',
-      'e': 'M 10 20 Q 25 10 40 20 Q 25 30 10 20',
-      'i': 'M 20 15 L 20 30 M 20 10 L 20 12',
-      'o': 'M 10 20 Q 25 10 40 20 Q 25 30 10 20 Z',
-      'u': 'M 10 15 L 10 25 Q 20 35 30 25 L 30 15',
-      'n': 'M 10 30 L 10 15 Q 20 10 30 15 L 30 30',
-      'm': 'M 5 30 L 5 15 Q 12 10 20 15 L 20 30 M 20 15 Q 27 10 35 15 L 35 30',
-      'r': 'M 10 30 L 10 15 Q 20 10 30 15',
-      's': 'M 30 18 Q 20 10 10 18 Q 20 25 30 30',
-      't': 'M 20 12 L 20 28 Q 25 32 30 28 M 15 18 L 25 18',
-      'l': 'M 20 8 L 20 30',
-      'd': 'M 35 8 L 35 30 M 10 20 Q 22 10 35 20 Q 22 30 10 20',
-      'h': 'M 10 8 L 10 30 M 10 18 Q 20 15 30 18 L 30 30',
-      'c': 'M 30 18 Q 20 10 10 18 Q 20 26 30 22',
-      'f': 'M 25 8 Q 20 5 15 8 L 15 30 M 10 18 L 22 18'
-    };
-    return paths[letter] || 'M 10 30 L 10 15 L 30 15';
+  const clearCanvas = () => {
+    if (fabricCanvas) {
+      fabricCanvas.clear();
+      fabricCanvas.backgroundColor = '#ffffff';
+      fabricCanvas.renderAll();
+      setHasDrawn(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="glass-card p-8 max-w-2xl w-full">
+      <Card className="glass-card p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold gradient-text mb-2">Handschrift-Training</h2>
+          <h2 className="text-2xl font-bold gradient-text mb-2">Ihre Handschrift lernen</h2>
           <p className="text-muted-foreground">
-            Zeichnen Sie den Buchstaben "{currentLetter.toUpperCase()}" in das lila Feld
+            Zeichnen Sie den Buchstaben "<span className="text-xl font-bold text-primary">{currentLetter.toUpperCase()}</span>" so, wie Sie normalerweise schreiben
           </p>
         </div>
 
@@ -91,48 +119,39 @@ export const HandwritingTraining = ({ onComplete, onClose }: HandwritingTraining
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           {/* Letter Display */}
           <div className="text-center">
-            <div className="text-8xl font-serif mb-4 text-primary">
+            <div className="text-9xl font-serif mb-4 text-primary/70 select-none">
               {currentLetter.toUpperCase()}
             </div>
+            <div className="text-6xl font-serif mb-4 text-primary/50 select-none">
+              {currentLetter.toLowerCase()}
+            </div>
             <p className="text-sm text-muted-foreground">
-              Zeichnen Sie diesen Buchstaben nach
+              Schauen Sie sich den Buchstaben an und zeichnen Sie ihn nach
             </p>
           </div>
 
           {/* Drawing Canvas */}
           <div className="flex flex-col items-center">
-            <div 
-              className="w-64 h-64 border-2 border-primary border-dashed rounded-lg bg-primary/5 relative cursor-crosshair"
-              style={{ touchAction: 'none' }}
-            >
+            <div className="border-2 border-primary rounded-lg p-4 bg-white">
               <canvas
-                width={256}
-                height={256}
-                className="absolute inset-0 w-full h-full"
-                onMouseDown={(e) => setIsDrawing(true)}
-                onMouseUp={() => setIsDrawing(false)}
-                onMouseMove={(e) => {
-                  if (isDrawing) {
-                    // Simplified drawing - in real implementation you'd track the actual path
-                    setCurrentPath("drawn");
-                  }
-                }}
+                ref={canvasRef}
+                className="border border-gray-200 rounded cursor-crosshair"
               />
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-primary/30 text-sm">Zeichnen Sie hier</span>
-              </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={() => {
-                setCurrentPath("");
-                setIsDrawing(false);
-              }}
-            >
-              Löschen
-            </Button>
+            <div className="flex gap-2 mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearCanvas}
+                className="flex items-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Löschen
+              </Button>
+              <span className="text-sm text-muted-foreground flex items-center">
+                {hasDrawn ? "✓ Gezeichnet" : "Zeichnen Sie den Buchstaben"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -152,27 +171,20 @@ export const HandwritingTraining = ({ onComplete, onClose }: HandwritingTraining
           </div>
 
           <div className="space-x-2">
-            <Button variant="outline" onClick={handleSkip}>
-              Überspringen
-            </Button>
             <Button 
-              onClick={() => {
-                // Save the drawn letter
-                const path = currentPath || generateDefaultLetterPath(currentLetter);
-                setTrainedLetters(prev => ({ ...prev, [currentLetter]: path }));
-                handleNext();
-              }}
-              disabled={!currentPath && currentIndex === trainingLetters.length - 1}
+              onClick={saveCurrentLetter}
+              disabled={!hasDrawn}
+              className="flex items-center gap-2"
             >
               {currentIndex === trainingLetters.length - 1 ? (
                 <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Fertig
+                  <Check className="w-4 h-4" />
+                  Training abschließen
                 </>
               ) : (
                 <>
-                  Weiter
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  Buchstabe speichern
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </Button>

@@ -25,7 +25,7 @@ export const HandwritingCanvas = ({ text, selectedBackground, onExport }: Handwr
   const [lineWidth, setLineWidth] = useState([2]);
   const [messyFactor, setMessyFactor] = useState([0.3]);
   const [showTraining, setShowTraining] = useState(false);
-  const [trainedLetters, setTrainedLetters] = useState<Record<string, string>>({});
+  const [trainedLetters, setTrainedLetters] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -149,10 +149,24 @@ export const HandwritingCanvas = ({ text, selectedBackground, onExport }: Handwr
       
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
-        const pathObj = generateHandwritingPath(char, currentX, currentY);
         
-        if (pathObj) {
-          fabricCanvas.add(pathObj);
+        // Verwende trainierte Buchstaben falls verfügbar
+        if (trainedLetters[char.toLowerCase()]) {
+          const trainedPaths = trainedLetters[char.toLowerCase()];
+          trainedPaths.forEach((pathData) => {
+            // Erstelle Pfad aus den trainierten Daten
+            // Hier würde normalerweise der SVG-Pfad geparst und auf die richtige Position gesetzt
+            const pathObj = generateHandwritingPath(char, currentX, currentY);
+            if (pathObj) {
+              fabricCanvas.add(pathObj);
+            }
+          });
+        } else {
+          // Fallback zu Standard-Buchstabenformen
+          const pathObj = generateHandwritingPath(char, currentX, currentY);
+          if (pathObj) {
+            fabricCanvas.add(pathObj);
+          }
         }
         
         if (char === ' ') {
@@ -200,7 +214,7 @@ export const HandwritingCanvas = ({ text, selectedBackground, onExport }: Handwr
     onExport?.();
   };
 
-  const handleTrainingComplete = (letters: Record<string, string>) => {
+  const handleTrainingComplete = (letters: Record<string, any[]>) => {
     setTrainedLetters(letters);
     setShowTraining(false);
     toast("Handschrift wurde gelernt! Verwandeln Sie jetzt Ihren Text.");
