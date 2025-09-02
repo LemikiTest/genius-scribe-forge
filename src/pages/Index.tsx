@@ -14,9 +14,24 @@ const Index = () => {
   const [selectedBackground, setSelectedBackground] = useState("#ffffff");
   const [hasDrawnText, setHasDrawnText] = useState(false);
 
+  const demoText = `# ChatGPT Antwort: Photosynthese
+
+Die **Photosynthese** ist ein lebenswichtiger Prozess, bei dem Pflanzen Lichtenergie in chemische Energie umwandeln.
+
+## Wichtige Punkte:
+
+- Verwendet *Sonnenlicht*, CO₂ und Wasser
+- Produziert Glukose und Sauerstoff
+- Findet in den Chloroplasten statt
+
+> "Ohne Photosynthese gäbe es kein Leben auf der Erde!"
+
+**Formel:** 6CO₂ + 6H₂O + Lichtenergie → C₆H₁₂O₆ + 6O₂`;
+
   const handleGetStarted = () => {
     setCurrentStep("editor");
-    toast("Willkommen bei Geniedetache! Geben Sie Ihren Text ein, um zu beginnen.");
+    setInputText(demoText); // Set demo text automatically
+    toast("Willkommen bei Geniedetache! Probieren Sie den Beispieltext aus oder geben Sie Ihren eigenen ein.");
   };
 
   const handleDrawText = () => {

@@ -32,7 +32,9 @@ export const Hero = ({ onGetStarted }: HeroProps) => {
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             <Button size="lg" variant="outline" className="text-lg px-8 py-6">
-              Demo ansehen
+              <a href="#demo" className="flex items-center">
+                Demo ansehen
+              </a>
             </Button>
           </div>
 

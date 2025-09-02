@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Canvas as FabricCanvas, Path, Group } from "fabric";
+import { Canvas as FabricCanvas, Path } from "fabric";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, Eraser } from "lucide-react";
+import { Download, Eraser, Zap } from "lucide-react";
+import { HandwritingTraining } from "./HandwritingTraining";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 
@@ -23,6 +24,8 @@ export const HandwritingCanvas = ({ text, selectedBackground, onExport }: Handwr
   const [lineSpacing, setLineSpacing] = useState([24]);
   const [lineWidth, setLineWidth] = useState([2]);
   const [messyFactor, setMessyFactor] = useState([0.3]);
+  const [showTraining, setShowTraining] = useState(false);
+  const [trainedLetters, setTrainedLetters] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -45,42 +48,84 @@ export const HandwritingCanvas = ({ text, selectedBackground, onExport }: Handwr
     const messy = messyFactor[0];
     const width = lineWidth[0];
     
-    // Simple letter path generation (this is a simplified version)
-    // In a real implementation, you'd have trained letter shapes
-    const randomOffset = () => (Math.random() - 0.5) * messy * 2;
+    const randomOffset = () => (Math.random() - 0.5) * messy * 4;
     
-    let path = "";
-    switch (char.toLowerCase()) {
-      case 'a':
-        path = `M ${x + randomOffset()} ${y + randomOffset()} 
-                Q ${x + size/3 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size/2 + randomOffset()} ${y + randomOffset()}
-                L ${x + size + randomOffset()} ${y + randomOffset()}
-                M ${x + size/4 + randomOffset()} ${y - size/4 + randomOffset()} 
-                L ${x + 3*size/4 + randomOffset()} ${y - size/4 + randomOffset()}`;
-        break;
-      case 'e':
-        path = `M ${x + randomOffset()} ${y - size/4 + randomOffset()} 
-                Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/4 + randomOffset()}
-                Q ${x + size/2 + randomOffset()} ${y + randomOffset()} ${x + randomOffset()} ${y - size/4 + randomOffset()}`;
-        break;
-      case 'l':
-        path = `M ${x + randomOffset()} ${y - size + randomOffset()} 
-                L ${x + randomOffset()} ${y + randomOffset()}`;
-        break;
-      case 'o':
-        path = `M ${x + randomOffset()} ${y - size/4 + randomOffset()} 
-                Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/4 + randomOffset()}
-                Q ${x + size/2 + randomOffset()} ${y + randomOffset()} ${x + randomOffset()} ${y - size/4 + randomOffset()} Z`;
-        break;
-      case ' ':
-        return null;
-      default:
-        // Generic letter shape
-        path = `M ${x + randomOffset()} ${y + randomOffset()} 
-                L ${x + randomOffset()} ${y - size/2 + randomOffset()}
-                L ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()}`;
-        break;
+    // Use trained letter if available, otherwise default shapes
+    const letterPaths: Record<string, string> = {
+      'a': `M ${x + randomOffset()} ${y + randomOffset()} 
+            Q ${x + size/3 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size/2 + randomOffset()} ${y + randomOffset()}
+            L ${x + size + randomOffset()} ${y + randomOffset()}
+            M ${x + size/4 + randomOffset()} ${y - size/4 + randomOffset()} 
+            L ${x + 3*size/4 + randomOffset()} ${y - size/4 + randomOffset()}`,
+      'e': `M ${x + randomOffset()} ${y - size/4 + randomOffset()} 
+            Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/4 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y + randomOffset()} ${x + randomOffset()} ${y - size/4 + randomOffset()}`,
+      'i': `M ${x + size/2 + randomOffset()} ${y - size + randomOffset()} 
+            L ${x + size/2 + randomOffset()} ${y + randomOffset()}
+            M ${x + size/2 + randomOffset()} ${y - size - 5 + randomOffset()} 
+            L ${x + size/2 + randomOffset()} ${y - size - 3 + randomOffset()}`,
+      'o': `M ${x + randomOffset()} ${y - size/4 + randomOffset()} 
+            Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/4 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y + randomOffset()} ${x + randomOffset()} ${y - size/4 + randomOffset()} Z`,
+      'u': `M ${x + randomOffset()} ${y - size/3 + randomOffset()} 
+            L ${x + randomOffset()} ${y - size/6 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y + size/6 + randomOffset()} ${x + size + randomOffset()} ${y - size/6 + randomOffset()}
+            L ${x + size + randomOffset()} ${y + randomOffset()}`,
+      'n': `M ${x + randomOffset()} ${y + randomOffset()} 
+            L ${x + randomOffset()} ${y - size/3 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/3 + randomOffset()}
+            L ${x + size + randomOffset()} ${y + randomOffset()}`,
+      'm': `M ${x + randomOffset()} ${y + randomOffset()} 
+            L ${x + randomOffset()} ${y - size/3 + randomOffset()}
+            Q ${x + size/4 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size/2 + randomOffset()} ${y - size/3 + randomOffset()}
+            L ${x + size/2 + randomOffset()} ${y + randomOffset()}
+            M ${x + size/2 + randomOffset()} ${y - size/3 + randomOffset()}
+            Q ${x + 3*size/4 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/3 + randomOffset()}
+            L ${x + size + randomOffset()} ${y + randomOffset()}`,
+      'r': `M ${x + randomOffset()} ${y + randomOffset()} 
+            L ${x + randomOffset()} ${y - size/3 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/3 + randomOffset()}`,
+      's': `M ${x + size + randomOffset()} ${y - size/6 + randomOffset()} 
+            Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + randomOffset()} ${y - size/6 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y + randomOffset()} ${x + size + randomOffset()} ${y + randomOffset()}`,
+      't': `M ${x + size/2 + randomOffset()} ${y - size + randomOffset()} 
+            L ${x + size/2 + randomOffset()} ${y - size/6 + randomOffset()}
+            Q ${x + 3*size/4 + randomOffset()} ${y + randomOffset()} ${x + size + randomOffset()} ${y - size/8 + randomOffset()}
+            M ${x + size/4 + randomOffset()} ${y - size/3 + randomOffset()} 
+            L ${x + 3*size/4 + randomOffset()} ${y - size/3 + randomOffset()}`,
+      'l': `M ${x + size/2 + randomOffset()} ${y - size + randomOffset()} 
+            L ${x + size/2 + randomOffset()} ${y + randomOffset()}`,
+      'd': `M ${x + size + randomOffset()} ${y - size + randomOffset()} 
+            L ${x + size + randomOffset()} ${y + randomOffset()}
+            M ${x + randomOffset()} ${y - size/4 + randomOffset()} 
+            Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/4 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y + randomOffset()} ${x + randomOffset()} ${y - size/4 + randomOffset()}`,
+      'h': `M ${x + randomOffset()} ${y - size + randomOffset()} 
+            L ${x + randomOffset()} ${y + randomOffset()}
+            M ${x + randomOffset()} ${y - size/3 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + size + randomOffset()} ${y - size/3 + randomOffset()}
+            L ${x + size + randomOffset()} ${y + randomOffset()}`,
+      'c': `M ${x + size + randomOffset()} ${y - size/6 + randomOffset()} 
+            Q ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()} ${x + randomOffset()} ${y - size/4 + randomOffset()}
+            Q ${x + size/2 + randomOffset()} ${y + randomOffset()} ${x + size + randomOffset()} ${y - size/6 + randomOffset()}`,
+      'f': `M ${x + 3*size/4 + randomOffset()} ${y - size + randomOffset()} 
+            Q ${x + size/2 + randomOffset()} ${y - size - size/4 + randomOffset()} ${x + size/4 + randomOffset()} ${y - size + randomOffset()}
+            L ${x + size/4 + randomOffset()} ${y + randomOffset()}
+            M ${x + randomOffset()} ${y - size/3 + randomOffset()} 
+            L ${x + size/2 + randomOffset()} ${y - size/3 + randomOffset()}`,
+      ' ': null // Space character
+    };
+
+    let path = letterPaths[char.toLowerCase()];
+    
+    // If no specific path for this character, create a generic one
+    if (path === undefined) {
+      path = `M ${x + randomOffset()} ${y + randomOffset()} 
+              L ${x + randomOffset()} ${y - size/2 + randomOffset()}
+              L ${x + size/2 + randomOffset()} ${y - size/2 + randomOffset()}`;
     }
+
+    if (path === null) return null; // Space character
     
     return new Path(path, {
       fill: '',
@@ -155,8 +200,22 @@ export const HandwritingCanvas = ({ text, selectedBackground, onExport }: Handwr
     onExport?.();
   };
 
+  const handleTrainingComplete = (letters: Record<string, string>) => {
+    setTrainedLetters(letters);
+    setShowTraining(false);
+    toast("Handschrift wurde gelernt! Verwandeln Sie jetzt Ihren Text.");
+  };
+
   return (
-    <div className="space-y-6">
+    <>
+      {showTraining && (
+        <HandwritingTraining
+          onComplete={handleTrainingComplete}
+          onClose={() => setShowTraining(false)}
+        />
+      )}
+      
+      <div className="space-y-6">
       {/* Canvas */}
       <Card className="glass-card p-6">
         <div className="border-2 border-dashed border-primary/20 rounded-lg overflow-hidden">
@@ -166,7 +225,17 @@ export const HandwritingCanvas = ({ text, selectedBackground, onExport }: Handwr
 
       {/* Controls */}
       <Card className="glass-card p-6">
-        <h3 className="text-lg font-semibold mb-4 gradient-text">Handschrift anpassen</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold gradient-text">Handschrift anpassen</h3>
+          <Button
+            onClick={() => setShowTraining(true)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Zap className="w-4 h-4" />
+            Handschrift trainieren
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="space-y-2">
             <Label>Buchstabenabstand</Label>
@@ -258,6 +327,7 @@ export const HandwritingCanvas = ({ text, selectedBackground, onExport }: Handwr
           </Button>
         </div>
       </Card>
-    </div>
+      </div>
+    </>
   );
 };

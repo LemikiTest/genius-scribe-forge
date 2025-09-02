@@ -14,12 +14,25 @@ interface TextInputProps {
 
 export const TextInput = ({ value, onChange, onDrawText }: TextInputProps) => {
   const [previewMode, setPreviewMode] = useState(false);
+  const [parsedMarkdown, setParsedMarkdown] = useState("");
 
   const parseMarkdown = async (text: string) => {
-    return await marked(text);
+    try {
+      const result = await marked(text);
+      setParsedMarkdown(result);
+      return result;
+    } catch (error) {
+      console.error('Markdown parsing error:', error);
+      const fallback = text.split('\n').map(line => `<div>${line || '<br>'}</div>`).join('');
+      setParsedMarkdown(fallback);
+      return fallback;
+    }
   };
 
-  const togglePreview = () => {
+  const togglePreview = async () => {
+    if (!previewMode) {
+      await parseMarkdown(value);
+    }
     setPreviewMode(!previewMode);
   };
 
@@ -44,11 +57,10 @@ export const TextInput = ({ value, onChange, onDrawText }: TextInputProps) => {
       
       {previewMode ? (
         <div className="min-h-[200px] p-4 border rounded-lg bg-card prose prose-sm max-w-none">
-          <div className="text-card-foreground">
-            {value.split('\n').map((line, index) => (
-              <div key={index}>{line || <br />}</div>
-            ))}
-          </div>
+          <div 
+            dangerouslySetInnerHTML={{ __html: parsedMarkdown }}
+            className="text-card-foreground"
+          />
         </div>
       ) : (
         <Textarea
